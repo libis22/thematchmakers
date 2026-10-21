@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Matchmakers</title>
+<!-- GFM markdown (tables, bold, links) -- the Harness replies in markdown. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1726;
+    --panel: #162236;
+    --bubble-user: #2563eb;
+    --bubble-assistant: #1c2b44;
+    --text: #e8edf6;
+    --text-dim: #9fb0c9;
+    --border: #28374f;
+    --accent: #38bdf8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header .mascot { font-size: 28px; }
+  header h1 { font-size: 17px; margin: 0; }
+  header p { font-size: 12.5px; color: var(--text-dim); margin: 2px 0 0; }
+  #thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .row { display: flex; gap: 10px; align-items: flex-start; }
+  .row.user { justify-content: flex-end; }
+  .avatar {
+    flex-shrink: 0;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    background: var(--bubble-assistant);
+  }
+  .bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.5;
+    font-size: 14.5px;
+    white-space: pre-wrap;
+  }
+  .row.assistant .bubble { background: var(--bubble-assistant); border-top-left-radius: 2px; }
+  .row.user .bubble { background: var(--bubble-user); border-top-right-radius: 2px; white-space: normal; }
+  .bubble table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+  .bubble th, .bubble td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+  .bubble th { background: #1f3250; }
+  .bubble a { color: var(--accent); }
+  .bubble p { margin: 0 0 8px; }
+  .bubble p:last-child { margin-bottom: 0; }
+  .typing { color: var(--text-dim); font-size: 13px; font-style: italic; }
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    padding: 14px 20px;
+  }
+  #composer {
+    max-width: 820px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+  }
+  #input {
+    flex: 1;
+    background: #0e1726;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 14.5px;
+    resize: none;
+    font-family: inherit;
+  }
+  #input:focus { outline: none; border-color: var(--accent); }
+  #send {
+    background: var(--bubble-user);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #send:disabled { opacity: 0.5; cursor: default; }
+  #err {
+    max-width: 820px;
+    margin: 0 auto 10px;
+    color: #fca5a5;
+    font-size: 13px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mascot">💘</div>
+  <div>
+    <h1>The Matchmakers</h1>
+    <p>DBHDD provider matching — internal demo</p>
+  </div>
+</header>
+
+<div id="thread"></div>
+<footer>
+  <div id="err"></div>
+  <div id="composer">
+    <textarea id="input" rows="1" placeholder="Describe who you're looking for a provider for…"></textarea>
+    <button id="send">Send</button>
+  </div>
+</footer>
+
+<script>
+  // ---- Fill these in after you deploy the backend (see README) ----
+  const API_URL = "https://p4u2xh2bgc67hkd7duvnwjohnm0mulxm.lambda-url.us-east-1.on.aws/";       // SAM output `FunctionUrl`
+  const SHARED_SECRET = "11215f70d0304816be9f91efcac95aeb"; // same value you passed as SharedSecret
+  // -------------------------------------------------------------------
+
+  const thread = document.getElementById("thread");
+  const input = document.getElementById("input");
+  const sendBtn = document.getElementById("send");
+  const errBox = document.getElementById("err");
+
+  // One session per browser tab. Cleared on tab close; a fresh tab starts a
+  // new conversation with the Harness. Swap sessionStorage for localStorage
+  // if you'd rather conversations survive a refresh across tabs too.
+  function getSessionId() {
+    let id = sessionStorage.getItem("matchmaker_session_id");
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem("matchmaker_session_id", id);
+    }
+    return id;
+  }
+
+  function addRow(role, content) {
+    const row = document.createElement("div");
+    row.className = "row " + role;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = role === "assistant" ? "💘" : "🙂";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = content;
+
+    if (role === "assistant") { row.appendChild(avatar); row.appendChild(bubble); }
+    else { row.appendChild(bubble); row.appendChild(avatar); }
+
+    thread.appendChild(row);
+    thread.scrollTop = thread.scrollHeight;
+    return bubble;
+  }
+
+  function addTyping() {
+    const row = document.createElement("div");
+    row.className = "row assistant";
+    row.id = "typing-row";
+    row.innerHTML = `<div class="avatar">💘</div><div class="bubble typing">The Matchmakers are thinking…</div>`;
+    thread.appendChild(row);
+    thread.scrollTop = thread.scrollHeight;
+  }
+
+  function removeTyping() {
+    document.getElementById("typing-row")?.remove();
+  }
+
+  // Fake word-by-word reveal of the full reply. The backend buffers the
+  // Harness's stream server-side (see README for why), so by the time we
+  // get here the whole answer is already in hand — this just makes it
+  // *feel* like it's being typed. Swap for real incremental rendering if
+  // the backend is upgraded to true HTTP streaming later.
+  function revealMarkdown(bubble, markdown, onDone) {
+    const words = markdown.split(/(\s+)/);
+    let i = 0;
+    const tick = () => {
+      i = Math.min(i + 3, words.length); // a few words per frame
+      bubble.innerHTML = marked.parse(words.slice(0, i).join(""));
+      thread.scrollTop = thread.scrollHeight;
+      if (i < words.length) requestAnimationFrame(() => setTimeout(tick, 15));
+      else onDone?.();
+    };
+    tick();
+  }
+
+  async function send() {
+    const message = input.value.trim();
+    if (!message) return;
+
+    errBox.style.display = "none";
+    input.value = "";
+    input.style.height = "auto";
+    sendBtn.disabled = true;
+
+    addRow("user", escapeHtml(message));
+    addTyping();
+
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-matchmaker-secret": SHARED_SECRET,
+        },
+        body: JSON.stringify({ message, session_id: getSessionId() }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      removeTyping();
+
+      if (!res.ok) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+
+      const bubble = addRow("assistant", "");
+      revealMarkdown(bubble, data.reply || "", () => { sendBtn.disabled = false; });
+    } catch (e) {
+      removeTyping();
+      errBox.textContent = "Something went wrong: " + e.message;
+      errBox.style.display = "block";
+      sendBtn.disabled = false;
+    }
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  sendBtn.addEventListener("click", send);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  input.addEventListener("input", () => {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 160) + "px";
+  });
+
+  addRow("assistant", marked.parse(
+    "Hi, I'm **The Matchmakers** 💘 — tell me the individual's location (address, county, or zip) " +
+    "and population (DD, CA, or AA/AC) and I'll find matching providers."
+  ));
+</script>
+
+</body>
+</html>

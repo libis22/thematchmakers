@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  The Matchmakers proxy Lambda — thin wrapper that calls the
+  provider_matching_assistant AgentCore Harness and returns its reply to the
+  chat SPA. Exposes a public Function URL guarded by a shared-secret header.
+
+Parameters:
+  HarnessArn:
+    Type: String
+    Description: ARN of the AgentCore Harness to invoke.
+    Default: arn:aws:bedrock-agentcore:us-east-1:196337091137:harness/provider_matching_assistant-2nQMmyJmAY
+
+  SharedSecret:
+    Type: String
+    Description: >
+      Value the frontend must send as the x-matchmaker-secret header. Pick any
+      random string. Leave blank to disable the check (not recommended,
+      even for an internal demo — the Function URL is otherwise public).
+    NoEcho: true
+    Default: ""
+
+  AllowedOrigin:
+    Type: String
+    Description: >
+      Origin allowed to call this Function URL (your Amplify app's URL,
+      e.g. https://main.d1234abcd.amplifyapp.com). Use * while you don't
+      know the Amplify URL yet, then tighten it once you do.
+    Default: "*"
+
+Resources:
+  MatchmakersProxyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: thematchmakers-proxy
+      CodeUri: .
+      Handler: app.lambda_handler
+      Runtime: python3.12
+      Timeout: 60
+      MemorySize: 256
+      Environment:
+        Variables:
+          HARNESS_ARN: !Ref HarnessArn
+          SHARED_SECRET: !Ref SharedSecret
+          ALLOWED_ORIGIN: !Ref AllowedOrigin
+      Policies:
+        - Statement:
+            - Sid: InvokeMatchmakingHarness
+              Effect: Allow
+              Action:
+                - bedrock-agentcore:InvokeHarness
+              Resource: !Ref HarnessArn
+      FunctionUrlConfig:
+        AuthType: NONE
+        InvokeMode: BUFFERED
+        Cors:
+          AllowOrigins:
+            - !Ref AllowedOrigin
+          AllowMethods:
+            - POST
+          AllowHeaders:
+            - content-type
+            - x-matchmaker-secret
+          MaxAge: 300
+
+Outputs:
+  FunctionUrl:
+    Description: Public URL the chat SPA calls. Paste into frontend/index.html as API_URL.
+    Value: !GetAtt MatchmakersProxyFunctionUrl.FunctionUrl
+
+  FunctionArn:
+    Description: Proxy Lambda ARN (useful for CloudWatch Logs lookups).
+    Value: !GetAtt MatchmakersProxyFunction.Arn

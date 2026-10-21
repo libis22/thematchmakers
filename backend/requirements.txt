@@ -1,0 +1,7 @@
+# bedrock-agentcore is a newer service and the Lambda runtime's built-in boto3
+# may predate it. Left unpinned on purpose so `sam build` installs the latest
+# boto3/botocore into the deployment package instead of relying on whatever
+# ships with the runtime. If you want reproducible builds later, pin these
+# to whatever versions you've tested against.
+boto3
+botocore
