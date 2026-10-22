@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>The Matchmakers</title>
+<title>MatchGPT</title>
 <!-- GFM markdown (tables, bold, links) -- the Harness replies in markdown. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <style>
@@ -220,7 +220,7 @@
 <header>
   <div class="mascot">🤝</div>
   <div>
-    <h1>The Matchmakers</h1>
+    <h1>MatchGPT</h1>
     <p>DBHDD provider matching</p>
   </div>
   <div class="brands">
@@ -292,7 +292,7 @@
     thread.innerHTML = "";
     errBox.style.display = "none";
     addRow("assistant", marked.parse(
-      "Hi, I'm **The Matchmakers** 🤝 — tell me the individual's location (address, county, or zip) " +
+      "Hi, I'm **MatchGPT** 🤝 — tell me the individual's location (address, county, or zip) " +
       "and population (DD, CA, or AA/AC) and I'll find matching providers."
     ));
     input.focus();
@@ -323,7 +323,7 @@
     const row = document.createElement("div");
     row.className = "row assistant";
     row.id = "typing-row";
-    row.innerHTML = `<div class="avatar">🤝</div><div class="bubble typing">The Matchmakers are thinking…</div>`;
+    row.innerHTML = `<div class="avatar">🤝</div><div class="bubble typing">MatchGPT is thinking…</div>`;
     thread.appendChild(row);
     thread.scrollTop = thread.scrollHeight;
   }
@@ -469,7 +469,7 @@
   }
 
   addRow("assistant", marked.parse(
-    "Hi, I'm **The Matchmakers** 🤝 — tell me the individual's location (address, county, or zip) " +
+    "Hi, I'm **MatchGPT** 🤝 — tell me the individual's location (address, county, or zip) " +
     "and population (DD, CA, or AA/AC) and I'll find matching providers."
   ));
 </script>
