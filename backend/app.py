@@ -35,17 +35,13 @@ SHARED_SECRET = os.environ.get("SHARED_SECRET", "")
 
 client = boto3.client("bedrock-agentcore", region_name=REGION)
 
-CORS_HEADERS = {
-    "Access-Control-Allow-Origin": os.environ.get("ALLOWED_ORIGIN", "*"),
-    "Access-Control-Allow-Headers": "content-type,x-matchmaker-secret",
-    "Access-Control-Allow-Methods": "POST,OPTIONS",
-}
-
+# NOTE: no manual CORS headers here on purpose — the Function URL's own
+# Cors config (in template.yaml) already attaches them to every response.
 
 def _response(status, body):
     return {
         "statusCode": status,
-        "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+        "headers": {"Content-Type": "application/json"},
         "body": json.dumps(body),
     }
 

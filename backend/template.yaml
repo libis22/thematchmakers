@@ -49,6 +49,7 @@ Resources:
               Effect: Allow
               Action:
                 - bedrock-agentcore:InvokeHarness
+                - bedrock-agentcore:InvokeAgentRuntime
               Resource: !Ref HarnessArn
       FunctionUrlConfig:
         AuthType: NONE

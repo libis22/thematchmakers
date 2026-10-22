@@ -20,7 +20,13 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--bg);
+    background-color: var(--bg);
+    /* Faint repeating watermark of handshake / location-pin / document glyphs,
+       drawn once as an SVG tile and repeated — keeps it a single self-contained
+       file with no extra image requests. */
+    background-image:
+      url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="220" height="220"><text x="18" y="40" font-size="30" opacity="0.05">🤝</text><text x="140" y="110" font-size="26" opacity="0.045">📍</text><text x="40" y="180" font-size="24" opacity="0.04">🗂️</text></svg>');
+    background-repeat: repeat;
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     display: flex;
@@ -38,6 +44,26 @@
   header .mascot { font-size: 28px; }
   header h1 { font-size: 17px; margin: 0; }
   header p { font-size: 12.5px; color: var(--text-dim); margin: 2px 0 0; }
+  header .brands {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header .brands span {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  header .brands img {
+    height: 22px;
+    width: auto;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 6px;
+    padding: 3px 6px;
+  }
   #thread {
     flex: 1;
     overflow-y: auto;
@@ -117,15 +143,51 @@
     font-size: 13px;
     display: none;
   }
+  #credits {
+    max-width: 820px;
+    margin: 12px auto 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
+  #credits .logos {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #credits .logos img {
+    height: 24px;
+    width: auto;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 6px;
+    padding: 3px 7px;
+  }
+  #credits p {
+    margin: 0;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="mascot">💘</div>
+  <div class="mascot">🤝</div>
   <div>
     <h1>The Matchmakers</h1>
     <p>DBHDD provider matching — internal demo</p>
+  </div>
+  <div class="brands">
+    <span>Powered by</span>
+    <img src="assets/dbhdd-logo.png" alt="DBHDD" />
+    <img src="assets/gta-logo.png" alt="Georgia Technology Authority" />
+    <img src="assets/aws-logo.jpg" alt="AWS" />
   </div>
 </header>
 
@@ -136,12 +198,24 @@
     <textarea id="input" rows="1" placeholder="Describe who you're looking for a provider for…"></textarea>
     <button id="send">Send</button>
   </div>
+  <div id="credits">
+    <div class="logos">
+      <img src="assets/dbhdd-logo.png" alt="DBHDD" />
+      <img src="assets/gta-logo.png" alt="Georgia Technology Authority" />
+      <img src="assets/aws-logo.jpg" alt="AWS" />
+    </div>
+    <p>
+      © 2026 Georgia Department of Behavioral Health &amp; Developmental Disabilities (DBHDD).
+      Built with the Georgia Technology Authority (GTA) on Amazon Web Services (AWS).
+      The DBHDD, GTA, and AWS names and logos are trademarks of their respective owners and are used here for attribution only.
+    </p>
+  </div>
 </footer>
 
 <script>
   // ---- Fill these in after you deploy the backend (see README) ----
-  const API_URL = "https://p4u2xh2bgc67hkd7duvnwjohnm0mulxm.lambda-url.us-east-1.on.aws/";       // SAM output `FunctionUrl`
-  const SHARED_SECRET = "11215f70d0304816be9f91efcac95aeb"; // same value you passed as SharedSecret
+  const API_URL = "PASTE_FUNCTION_URL_HERE";       // SAM output `FunctionUrl`
+  const SHARED_SECRET = "PASTE_SHARED_SECRET_HERE"; // same value you passed as SharedSecret
   // -------------------------------------------------------------------
 
   const thread = document.getElementById("thread");
@@ -167,7 +241,7 @@
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.textContent = role === "assistant" ? "💘" : "🙂";
+    avatar.textContent = role === "assistant" ? "🤝" : "🙂";
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
@@ -185,7 +259,7 @@
     const row = document.createElement("div");
     row.className = "row assistant";
     row.id = "typing-row";
-    row.innerHTML = `<div class="avatar">💘</div><div class="bubble typing">The Matchmakers are thinking…</div>`;
+    row.innerHTML = `<div class="avatar">🤝</div><div class="bubble typing">The Matchmakers are thinking…</div>`;
     thread.appendChild(row);
     thread.scrollTop = thread.scrollHeight;
   }
@@ -267,7 +341,7 @@
   });
 
   addRow("assistant", marked.parse(
-    "Hi, I'm **The Matchmakers** 💘 — tell me the individual's location (address, county, or zip) " +
+    "Hi, I'm **The Matchmakers** 🤝 — tell me the individual's location (address, county, or zip) " +
     "and population (DD, CA, or AA/AC) and I'll find matching providers."
   ));
 </script>
