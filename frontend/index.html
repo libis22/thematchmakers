@@ -213,31 +213,51 @@
     line-height: 1.6;
     color: var(--text-dim);
   }
+  /* Screen-reader-only: visually hidden but still read by assistive tech. */
+  .visually-hidden {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  a:focus-visible, button:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #mic.recording { animation: none; }
+  }
 </style>
 </head>
 <body>
 
+<a href="#input" class="visually-hidden">Skip to message box</a>
+
 <header>
-  <div class="mascot">🤝</div>
+  <div class="mascot" aria-hidden="true">🤝</div>
   <div>
     <h1>MatchGPT</h1>
     <p>DBHDD provider matching</p>
   </div>
   <div class="brands">
     <span>Powered by</span>
-    <img src="assets/dbhdd-logo.png" alt="DBHDD" />
-    <img src="assets/gta-logo.png" alt="Georgia Technology Authority" />
-    <img src="assets/aws-logo.jpg" alt="AWS" />
-    <button id="newChat" title="Start a new conversation">+ New chat</button>
+    <img src="assets/dbhdd-logo.png" alt="Georgia Department of Behavioral Health & Developmental Disabilities (DBHDD)" />
+    <img src="assets/gta-logo.png" alt="Georgia Technology Authority (GTA)" />
+    <img src="assets/aws-logo.jpg" alt="Amazon Web Services (AWS)" />
+    <button id="newChat" aria-label="Start a new conversation, clearing the current chat">+ New chat</button>
   </div>
 </header>
 
-<div id="thread"></div>
+<main id="thread" aria-label="Conversation"></main>
+<div id="sr-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
 <footer>
-  <div id="err"></div>
+  <div id="err" role="alert" aria-live="assertive"></div>
   <div id="composer">
+    <label for="input" class="visually-hidden">Describe who you're looking for a provider for</label>
     <textarea id="input" rows="1" placeholder="Describe who you're looking for a provider for…"></textarea>
-    <button id="mic" title="Speak your message">🎤</button>
+    <button id="mic" aria-label="Start voice input" aria-pressed="false" title="Speak your message">🎤</button>
     <button id="send">Send</button>
   </div>
   <div id="credits">
@@ -266,6 +286,8 @@
   const micBtn = document.getElementById("mic");
   const newChatBtn = document.getElementById("newChat");
   const errBox = document.getElementById("err");
+  const srStatus = document.getElementById("sr-status");
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // One session per browser tab. Cleared on tab close; a fresh tab starts a
   // new conversation with the Harness. Swap sessionStorage for localStorage
@@ -295,6 +317,7 @@
       "Hi, I'm **MatchGPT** 🤝 — tell me the individual's location (address, county, or zip) " +
       "and population (DD, CA, or AA/AC) and I'll find matching providers."
     ));
+    srStatus.textContent = "Started a new conversation.";
     input.focus();
   }
 
@@ -304,6 +327,7 @@
 
     const avatar = document.createElement("div");
     avatar.className = "avatar";
+    avatar.setAttribute("aria-hidden", "true");
     avatar.textContent = role === "assistant" ? "🤝" : "🙂";
 
     const bubble = document.createElement("div");
@@ -323,9 +347,10 @@
     const row = document.createElement("div");
     row.className = "row assistant";
     row.id = "typing-row";
-    row.innerHTML = `<div class="avatar">🤝</div><div class="bubble typing">MatchGPT is thinking…</div>`;
+    row.innerHTML = `<div class="avatar" aria-hidden="true">🤝</div><div class="bubble typing">MatchGPT is thinking…</div>`;
     thread.appendChild(row);
     thread.scrollTop = thread.scrollHeight;
+    srStatus.textContent = "MatchGPT is thinking.";
   }
 
   function removeTyping() {
@@ -338,9 +363,17 @@
   // one-word-per-line columns.
   function wrapTables(bubble) {
     bubble.querySelectorAll("table").forEach((table) => {
+      // Screen readers need scope="col" to announce which header a cell
+      // belongs to as you move through the table — marked.js doesn't add it.
+      table.querySelectorAll("th").forEach((th) => {
+        if (!th.hasAttribute("scope")) th.setAttribute("scope", "col");
+      });
       if (table.parentElement.classList.contains("table-scroll")) return;
       const wrap = document.createElement("div");
       wrap.className = "table-scroll";
+      wrap.setAttribute("tabindex", "0"); // keyboard users can scroll it with arrow keys
+      wrap.setAttribute("role", "region");
+      wrap.setAttribute("aria-label", "Results table, scrollable");
       table.replaceWith(wrap);
       wrap.appendChild(table);
     });
@@ -352,6 +385,17 @@
   // *feel* like it's being typed. Swap for real incremental rendering if
   // the backend is upgraded to true HTTP streaming later.
   function revealMarkdown(bubble, markdown, onDone) {
+    // Respect the OS/browser "reduce motion" setting — screen reader and
+    // motion-sensitive users get the full reply instantly instead of a
+    // 15ms-per-frame animation.
+    if (prefersReducedMotion) {
+      bubble.innerHTML = marked.parse(markdown);
+      wrapTables(bubble);
+      thread.scrollTop = thread.scrollHeight;
+      srStatus.textContent = "MatchGPT replied.";
+      onDone?.();
+      return;
+    }
     const words = markdown.split(/(\s+)/);
     let i = 0;
     const tick = () => {
@@ -360,7 +404,10 @@
       wrapTables(bubble);
       thread.scrollTop = thread.scrollHeight;
       if (i < words.length) requestAnimationFrame(() => setTimeout(tick, 15));
-      else onDone?.();
+      else {
+        srStatus.textContent = "MatchGPT replied.";
+        onDone?.();
+      }
     };
     tick();
   }
@@ -447,6 +494,8 @@
     recognizer.addEventListener("start", () => {
       listening = true;
       micBtn.classList.add("recording");
+      micBtn.setAttribute("aria-pressed", "true");
+      micBtn.setAttribute("aria-label", "Stop voice input");
     });
 
     recognizer.addEventListener("result", (e) => {
@@ -460,12 +509,16 @@
     const stopListening = () => {
       listening = false;
       micBtn.classList.remove("recording");
+      micBtn.setAttribute("aria-pressed", "false");
+      micBtn.setAttribute("aria-label", "Start voice input");
     };
     recognizer.addEventListener("end", stopListening);
     recognizer.addEventListener("error", stopListening);
   } else {
     micBtn.disabled = true;
+    micBtn.removeAttribute("aria-pressed");
     micBtn.title = "Voice input isn't supported in this browser — try Chrome or Edge.";
+    micBtn.setAttribute("aria-label", "Voice input isn't supported in this browser");
   }
 
   addRow("assistant", marked.parse(
